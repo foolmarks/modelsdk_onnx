@@ -5,17 +5,58 @@ How to quantize and compile a ResNet50 ONNX classifier model using Palette 1.6.
 This tutorial shows how to run default Post-Training Quantization (PTQ), evaluate the quantized model and then compiling for the output .tar.gz archive.
 
 
-## Before starting ##
+## Design Flow ##
+
+Start the SDK docker container - just reply with './' when asked for the work directory:
+
+```shell
+python ./start.py
+```
+
+The output in the console should look like this:
+
+```shell
+user@ubmsh:~/tutorials/modelsdk_pytorch$ python ./start.py 
+Set no_proxy to localhost,127.0.0.0
+Using port 49152 for the installation.
+Checking if the container is already running...
+Enter work directory [/home/mark/tutorials/ext/modelsdk_onnx]: ./
+Starting the container: palettesdk_1_6_0_Palette_SDK_master_B202
+Checking SiMa SDK Bridge Network...
+SiMa SDK Bridge Network found.
+Creating and starting the Docker container...
+8e5b8a6932898540be4db29a6eab7b1c5594b6de2bb1c0d69f2b766ec415cf59
+Successfully copied 3.07kB to /home/mark/tutorials/ext/modelsdk_onnx/passwd.txt
+Successfully copied 3.07kB to palettesdk_1_6_0_Palette_SDK_master_B202:/etc/passwd
+Successfully copied 2.56kB to /home/mark/tutorials/ext/modelsdk_onnx/shadow.txt
+Successfully copied 2.56kB to palettesdk_1_6_0_Palette_SDK_master_B202:/etc/shadow
+Successfully copied 2.56kB to /home/mark/tutorials/ext/modelsdk_onnx/group.txt
+Successfully copied 2.56kB to palettesdk_1_6_0_Palette_SDK_master_B202:/etc/group
+Successfully copied 3.58kB to /home/mark/tutorials/ext/modelsdk_onnx/sudoers.txt
+Successfully copied 3.58kB to palettesdk_1_6_0_Palette_SDK_master_B202:/etc/sudoers
+Successfully copied 2.05kB to palettesdk_1_6_0_Palette_SDK_master_B202:/home/docker/.simaai/.port
+user@b376b8672572:/home$ 
+```
+
+Navigate to the workspace:
+
+```shell
+cd docker/sima-cli
+```
 
 ### The ONNX model ###
 
-Unzip the ONNX model:
+Download the PyTorch ResNet50 model and convert it to ONNX format:
 
 ```shell
-unzip ./onnx/resnet50.zip -d ./onnx
+cd onnx
+python make_resnet50.py
+cd ..
 ```
 
-The ONNX model is trained on the ImageNet dataset using images that have been scaled up to 224(W)x224(H).
+
+
+The ONNX model is trained on the ImageNet dataset using images that have been scaled to a size of 224(W)x224(H) pixels.
 
 The ONNX model must:
 
@@ -31,7 +72,6 @@ To check this, use the [Netron](https://netron.app/) tool:
 
 
 We see in Netron that the input (called 'input') has a shape of 1,3,224,224.
-
 
 Note down the name of the input and its shape - you will need it later. It also useful to know the order of the model input dimensions - in this case, the order is NCHW (N=batch, C=channels, H=Height, W=Width)
 
@@ -77,41 +117,11 @@ with np.load(args.test_data) as data:
 
 An optional step is to run inference of the original ONNX model and check the output to ensure that it is functional and to create a baseline reference. ONNX and the ONNX Runtime are included in the SDK docker, so we can run the floating-point model. The run_onnx.py script includes pre- and postprocessing. 
 
-Start the Palette docker container - just reply with './' when asked for the work directory:
+
+Navigate back up into the working directory:
 
 ```shell
-./start.py
-```
-
-The output in the console will look like this:
-
-```shell
-user@ubmsh:~/tutorials/modelsdk_onnx$ ./start.py 
-Set no_proxy to localhost,127.0.0.0
-Using port 49152 for the installation.
-Checking if the container is already running...
-Enter work directory [/home/user/tutorials/modelsdk_onnx]: ./
-Starting the container: palettesdk_1_6_0_Palette_SDK_master_B163
-Checking SiMa SDK Bridge Network...
-SiMa SDK Bridge Network found.
-Creating and starting the Docker container...
-b376b867257233623491103715372c56d56d0403ca3c0da4d68a3cde2c7c6a27
-Successfully copied 3.07kB to /home/user/tutorials/modelsdk_onnx/passwd.txt
-Successfully copied 3.07kB to palettesdk_1_6_0_Palette_SDK_master_B163:/etc/passwd
-Successfully copied 2.56kB to /home/user/tutorials/modelsdk_onnx/shadow.txt
-Successfully copied 2.56kB to palettesdk_1_6_0_Palette_SDK_master_B163:/etc/shadow
-Successfully copied 2.56kB to /home/user/tutorials/modelsdk_onnx/group.txt
-Successfully copied 2.56kB to palettesdk_1_6_0_Palette_SDK_master_B163:/etc/group
-Successfully copied 3.58kB to /home/user/tutorials/modelsdk_onnx/sudoers.txt
-Successfully copied 3.58kB to palettesdk_1_6_0_Palette_SDK_master_B163:/etc/sudoers
-Successfully copied 2.05kB to palettesdk_1_6_0_Palette_SDK_master_B163:/home/docker/.simaai/.port
-user@b376b8672572:/home$ 
-```
-
-Then navigate into the working directory:
-
-```shell
-user@b376b8672572:/home$ cd docker/sima-cli
+user@b376b8672572:/homedocker/sima-cli/onnx$ cd ..
 ```
 
 Now execute the script that runs the floating-point Keras model: 
@@ -125,13 +135,13 @@ The output predictions are listed and a final accuracy scores is given:
 
 ```shell
 --------------------------------------------------
-3.10.12 (main, Mar 31 2025, 18:12:36) [GCC 11.4.0]
+3.10.12 (main, May 15 2025, 05:38:06) [GCC 11.4.0]
 --------------------------------------------------
 Loaded model from ./onnx/resnet50.onnx
 Model inputs:
  input  (1, 3, 224, 224)
 Number of test images:  50
-Correct predictions:  30  Accuracy %: 60.0
+Correct predictions:  38  Accuracy %: 76.0
 ```
 
 
@@ -152,22 +162,22 @@ python run_modelsdk.py
 If this runs correctly, the final output messages in the console will be like this:
 
 ```shell
-2025-04-27 03:20:02,501 - afe.backends.mpk.interface - INFO - ==============================
-2025-04-27 03:20:02,501 - afe.backends.mpk.interface - INFO - Compilation summary:
-2025-04-27 03:20:02,501 - afe.backends.mpk.interface - INFO - ------------------------------
-2025-04-27 03:20:02,502 - afe.backends.mpk.interface - INFO - Desired batch size: 1
-2025-04-27 03:20:02,502 - afe.backends.mpk.interface - INFO - Achieved batch size: 1
-2025-04-27 03:20:02,502 - afe.backends.mpk.interface - INFO - ------------------------------
-2025-04-27 03:20:02,502 - afe.backends.mpk.interface - INFO - Plugin distribution per backend:
-2025-04-27 03:20:02,502 - afe.backends.mpk.interface - INFO -   MLA : 1
-2025-04-27 03:20:02,502 - afe.backends.mpk.interface - INFO -   EV74: 5
-2025-04-27 03:20:02,502 - afe.backends.mpk.interface - INFO -   A65 : 0
-2025-04-27 03:20:02,502 - afe.backends.mpk.interface - INFO - ------------------------------
-2025-04-27 03:20:02,502 - afe.backends.mpk.interface - INFO - Generated files: resnet50_mpk.json, mla.json, resnet50_stage1_mla_stats.yaml, preproc.json, resnet50_stage1_mla.elf, detess_dequant.json
+2025-06-26 11:49:22,606 - afe.backends.mpk.interface - INFO - ==============================
+2025-06-26 11:49:22,606 - afe.backends.mpk.interface - INFO - Compilation summary:
+2025-06-26 11:49:22,606 - afe.backends.mpk.interface - INFO - ------------------------------
+2025-06-26 11:49:22,606 - afe.backends.mpk.interface - INFO - Desired batch size: 1
+2025-06-26 11:49:22,607 - afe.backends.mpk.interface - INFO - Achieved batch size: 1
+2025-06-26 11:49:22,607 - afe.backends.mpk.interface - INFO - ------------------------------
+2025-06-26 11:49:22,607 - afe.backends.mpk.interface - INFO - Plugin distribution per backend:
+2025-06-26 11:49:22,607 - afe.backends.mpk.interface - INFO -   MLA : 1
+2025-06-26 11:49:22,607 - afe.backends.mpk.interface - INFO -   EV74: 5
+2025-06-26 11:49:22,607 - afe.backends.mpk.interface - INFO -   A65 : 0
+2025-06-26 11:49:22,607 - afe.backends.mpk.interface - INFO - ------------------------------
+2025-06-26 11:49:22,607 - afe.backends.mpk.interface - INFO - Generated files: quanttess.json, resnet50_mpk.json, boxdecoder.json, process_mla.json, resnet50_stage1_mla_stats.yaml, preproc.json, postproc.json, resnet50_stage1_mla.elf
 Compiled model written to build/resnet50
 ```
 
-The compiled model is written to build/resnet50/resnet50_mpk.tar.gz.
+The compiled model is written to build/resnet50/resnet50_mpk.tar.gz (along with a number of other files which we won't be using for now).
 
 
 
